@@ -7,6 +7,7 @@ package tun
 
 import (
 	"net/netip"
+	"slices"
 	"testing"
 
 	"golang.org/x/sys/unix"
@@ -288,7 +289,12 @@ func Fuzz_handleGRO(f *testing.F) {
 	pkt11 := udp6Packet(ip6PortA, ip6PortC, 100)
 	f.Add(pkt0, pkt1, pkt2, pkt3, pkt4, pkt5, pkt6, pkt7, pkt8, pkt9, pkt10, pkt11, true, offset)
 	f.Fuzz(func(t *testing.T, pkt0, pkt1, pkt2, pkt3, pkt4, pkt5, pkt6, pkt7, pkt8, pkt9, pkt10, pkt11 []byte, canUDPGRO bool, offset int) {
-		pkts := [][]byte{pkt0, pkt1, pkt2, pkt3, pkt4, pkt5, pkt6, pkt7, pkt8, pkt9, pkt10, pkt11}
+		// Make copies of the packets so we don't modify the underlying buffer for libFuzzer runtime
+		rawPkts := [][]byte{pkt0, pkt1, pkt2, pkt3, pkt4, pkt5, pkt6, pkt7, pkt8, pkt9, pkt10, pkt11}
+		pkts := make([][]byte, len(rawPkts))
+		for i, pkt := range rawPkts {
+			pkts[i] = slices.Clone(pkt)
+		}
 		toWrite := make([]int, 0, len(pkts))
 		handleGRO(pkts, offset, newTCPGROTable(), newUDPGROTable(), canUDPGRO, &toWrite)
 		if len(toWrite) > len(pkts) {
